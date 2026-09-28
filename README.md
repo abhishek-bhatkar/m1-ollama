@@ -21,9 +21,16 @@ Reddit-verified daily driver: `qwen3.5:9b` GGUF Q4_K_M, thinking off, 32K contex
 ```bash
 ./scripts/status.sh      # service + model + GPU check
 ./scripts/benchmark.sh   # 40-token story, reports tok/s
+./scripts/bench-suite.sh qwen3.5-9b-32k ollama-local/qwen3.5-9b-32k
+# full real-world suite (L0 chat, L1 edit, L2 bounded agent) -> results/
 ollama run qwen3.5-9b-32k "Reply with exactly: LOCAL OK"
-opencode run --model ollama-local/qwen3.5-9b-32k "your task"
 ```
+
+## Real-world verdict in T3 Code
+
+See `docs/REALWORLD.md` + `results/` baseline. Chat/edit = usable (~10 tok/s),
+agent/planning loops = not usable (L2 timeout). A model graduates to
+"agent usable" only if L2 passes twice in a row via `bench-suite.sh`.
 
 ## Why this model
 
