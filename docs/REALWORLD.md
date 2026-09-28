@@ -1,34 +1,40 @@
-# Real-world scenario - qwen3.5-9b-32k in T3 Code (2026-09-27)
+# Real-world scenarios in T3 Code (M1 16GB, updated 2026-09-28)
 
 Hardware: MacBook Pro M1, 16GB unified (~10-11GB usable). Ollama 0.34.4,
-`FLASH_ATTENTION=1`, `KV_CACHE q8_0`. Model 6.6GB GGUF Q4_K_M, 100% GPU, ctx 32768.
+`FLASH_ATTENTION=1`, `KV_CACHE q8_0`.
 
-## What was tried
+## A. qwen3.5-9b-32k (6.6GB) - 2026-09-27: agent FAIL
 
-1. Direct Ollama chat (API + `ollama run --think=false`): PASS.
-   "Reply with exactly: LOCAL OK" -> `LOCAL OK` in ~8s cold (model load included).
-2. Direct story gen (40 tokens): PASS, 10.0 tok/s.
-3. `opencode run --model ollama-local/qwen3.5-9b-32k "Reply with exactly: T3 OK"`
-   in `m1-ollama/`: FAIL (timeout). No output after 180s. Ollama log showed
-   one slot processed 2077 tokens then went idle. Process had to be killed.
+1. Direct chat: PASS (`LOCAL OK` ~8s cold). Story 40 tokens: PASS, 10.0 tok/s.
+2. `opencode run --model ollama-local/qwen3.5-9b-32k "Reply with exactly: T3 OK"`:
+   FAIL (timeout). No output after 180s; slot burned 2077 tokens then idled.
+   Same again via bench-suite (120s timeout): FAIL.
+   Cause: agent loop + thinking/tool-parser issues on Qwen3.5 via Ollama.
+   Verdict: chat/small edits only, not agent. Baseline: `results/qwen3.5-9b-32k-20260928-1216.md`.
 
-## Interpretation
+## B. qwen25-coder-32k (4.7GB) - 2026-09-28: agent GRADUATED ✅
 
-- Provider wiring is correct (`opencode models ollama-local` lists the model,
-  `/v1/models` serves it). Failure is not config - it is the agent loop:
-  system prompt + tools + history inflate context, 9B on M1 burns ~2K tokens
-  without converging, matching Reddit reports (thinking loops, Qwen3.5 tool-parser
-  issues on Ollama, 16GB agent slowness vs 7x faster GPT-4o).
-- Same pattern as r/LocalLLaMA "Qwen 3.5 9b stuck as agent on M1 Mini 16GB":
-  fix is think-off + small scope, but full planning mode still stalls.
+`FROM qwen2.5-coder:7b`, num_ctx 32768. Provider entry `ollama-local/qwen25-coder-32k`.
 
-## Verdict (stands until re-benchmarked)
+| Tier | Run 1 (1243, cold) | Run 2 (1245, warm) |
+|------|--------------------|--------------------|
+| L0a exact | PASS 3.1s | PASS 0.8s |
+| L0b story | PASS 7.3 tok/s | PASS 7.4 tok/s |
+| L1 edit | PASS 7.2 tok/s | PASS 7.3 tok/s |
+| L2 agent | PASS 110.8s | PASS 2.9s |
 
-| Use in T3 Code | Result |
-|----------------|--------|
-| Chat / explain / summarize | Usable (~10 tok/s) |
-| Single small scoped edit | Usable, slow |
-| Agent / planning / multi-file refactor | Not usable - use cloud |
+L2 passed twice in a row -> **graduated to "agent usable"** per suite rule.
+Note the cold/warm split: first-ever agent invocation took 110s (model load +
+agent exploration), then 3s warm. In T3 Code, expect the first agent call of
+the day to be slow; keep tasks small and scoped. Heavy multi-file refactors
+still belong on cloud.
+Baselines: `results/qwen25-coder-32k-20260928-1243.md`, `...-1245.md`.
+
+## Current recommendation
+
+- T3 Code agent (local): `ollama-local/qwen25-coder-32k`
+- T3 Code chat/summarize: `ollama-local/qwen3.5-9b-32k` (smarter, ~10 tok/s)
+- Hard tasks: cloud (Muse Spark / Claude).
 
 ## How to re-test any model
 
