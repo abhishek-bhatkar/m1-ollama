@@ -1,46 +1,64 @@
 # m1-ollama
 
-Local LLM setup for MacBook Pro M1 / 16GB unified memory.
-Reddit-verified daily driver: `qwen3.5:9b` GGUF Q4_K_M, thinking off, 32K context.
+Local LLMs on a MacBook Pro M1 / 16GB — tested, benchmarked, and wired into
+[T3 Code](https://github.com/pingdotgg/t3code) (OpenCode-compatible).
+No cloud needed for everyday agent work.
 
-## Hardware
+Hardware: Apple M1 · 16GB unified (~10–11GB usable) · Ollama 0.34.4 (brew service)
 
-- Chip: Apple M1 (8-core), arm64
-- RAM: 16GB unified ( ~10-11GB usable after macOS )
-- Disk free at setup: 99GB
+## Fleet status
 
-## Stack
+| Model (Ollama) | T3 Code name | Size | Chat | Agent (L2 2x) | Role |
+|---|---|---|---|---|---|
+| `qwen35-4b-32k` | Qwen3.5 4B 32K (local tools) ✅ | 3.9GB | 18 tok/s | **PASS ~69s x2** | Terminal / agent work |
+| `qwen25-coder-32k` | Qwen2.5-Coder 7B 32K (local agent) ✅ | 5.5GB | 7 tok/s | **PASS 110s/3s** | Codegen quality |
+| `qwen3.5-9b-32k` | Qwen3.5 9B 32K (local, think off) | 6.1GB | 10 tok/s | FAIL (timeout x2) | Chat / summarize |
 
-- Runtime: Ollama 0.34.4 (brew service, autostart)
-- Env: `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_CONTEXT_LENGTH=32000`
-- Model: `qwen3.5:9b` (6.6GB) + wrapper `qwen3.5-9b-32k` (num_ctx 32768, think off)
-- Agent model: `qwen2.5-coder:7b` (4.7GB) + wrapper `qwen25-coder-32k` ✅ graduated (L2 2x PASS)
-- Tools model: `qwen3.5:4b` (3.4GB) + wrapper `qwen35-4b-32k` ✅ graduated (L2 2x PASS ~69s, ~18 tok/s)
-- Provider: `ollama-local` in `~/.config/opencode/opencode.json` -> `http://localhost:11434/v1`
+Full evidence: [`docs/REALWORLD.md`](docs/REALWORLD.md) · raw runs: [`results/`](results/)
 
-## Quick start
+**TL;DR:** the tiny 4B is the best terminal agent (top tool-calling eval, Mar 2026:
+97.5%); the 7B coder writes better code; the 9B is smartest for chat but can't
+close the agent loop on 16GB. Hard stuff still goes to cloud.
+
+## Quickstart
 
 ```bash
-./scripts/status.sh      # service + model + GPU check
-./scripts/benchmark.sh   # 40-token story, reports tok/s
-./scripts/bench-suite.sh qwen3.5-9b-32k ollama-local/qwen3.5-9b-32k
-# full real-world suite (L0 chat, L1 edit, L2 bounded agent) -> results/
-ollama run qwen3.5-9b-32k "Reply with exactly: LOCAL OK"
+brew install ollama && brew services start ollama
+ollama pull qwen3.5:4b
+printf 'FROM qwen3.5:4b\nPARAMETER num_ctx 32768\nPARAMETER temperature 0.6\n' > Modelfile
+ollama create qwen35-4b-32k -f Modelfile
+./scripts/status.sh       # service + models + GPU check
+./scripts/bench-suite.sh qwen35-4b-32k ollama-local/qwen35-4b-32k
 ```
 
-## Real-world verdict in T3 Code
+T3 Code wiring: add an `ollama-local` provider (`@ai-sdk/openai-compatible`,
+`http://localhost:11434/v1`) to `~/.config/opencode/opencode.json`, or copy this
+repo's [`opencode.json`](opencode.json) (pins the 4B as project default).
 
-See `docs/REALWORLD.md` + `results/` baselines.
-* Agent (local): `ollama-local/qwen35-4b-32k` ✅ L2 passed 2x (~69s, ~18 tok/s, best tool-call reliability)
-* Codegen (local): `ollama-local/qwen25-coder-32k` ✅ L2 passed 2x (110s cold, 3s warm)
-* Chat (local): `ollama-local/qwen3.5-9b-32k` (~10 tok/s, smarter, no agent loop)
-* Hard tasks: cloud. A model graduates to "agent usable" only if L2 passes twice
-  in a row via `bench-suite.sh`.
+## Method
 
-## Why this model
+`scripts/bench-suite.sh` grades every model the same way: **L0** direct chat,
+**L1** single-file fix via API, **L2** bounded `opencode run` (120s timeout, hangs
+become FAIL). A model graduates to "agent usable" only on **L2 PASS twice in a row**.
+Reddit + benchmark research behind the picks: [`docs/NOTES.md`](docs/NOTES.md).
 
-See `docs/NOTES.md` (Reddit consensus Sep 2026) and `docs/BENCHMARK.md` (measured 10.0 tok/s, 100% GPU, 32K).
+## Layout
 
-## Why GGUF not MLX
+```
+m1-ollama/
+  opencode.json        # project default: local 4B (copy to any project)
+  docs/NOTES.md        # Reddit + Sep-2026 research (MLX vs GGUF, 16GB tiers)
+  docs/BENCHMARK.md    # tok/s measurements on this M1
+  docs/REALWORLD.md    # T3 Code thread outcomes + current recommendation
+  results/             # every bench-suite run, one file per model run
+  scripts/bench-suite.sh|py  # the grader (timeouts included)
+  scripts/status.sh|benchmark.sh|run-local.sh|fixtures/
+```
 
-M1 lacks native bf16, Qwen3.5 hybrid attention is better in llama.cpp, MLX build is 8.9GB vs 6.6GB GGUF. Details in `docs/NOTES.md`.
+## Lessons (M1 16GB)
+
+- GGUF, not MLX (no native bf16 on M1; MLX build is also 2GB heavier).
+- Thinking mode OFF for agents (hangs the loop); 20–32K ctx, not 128K.
+- First agent call of the day is slow (~1–2 min cold prefill); then seconds.
+- T3 Code's agent prompt is ~13K tokens — disable unused MCP servers.
+- Small models need explicit per-step tool instructions, not open-ended asks.
