@@ -1,0 +1,5 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama-local/qwen35-4b-32k",
+  "small_model": "ollama-local/qwen35-4b-32k"
+}

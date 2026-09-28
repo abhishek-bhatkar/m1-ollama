@@ -36,6 +36,32 @@ Baselines: `results/qwen25-coder-32k-20260928-1243.md`, `...-1245.md`.
 - T3 Code chat/summarize: `ollama-local/qwen3.5-9b-32k` (smarter, ~10 tok/s)
 - Hard tasks: cloud (Muse Spark / Claude).
 
+## C. qwen35-4b-32k (3.4GB) - 2026-09-28: agent GRADUATED ✅ (tool-call specialist)
+
+`FROM qwen3.5:4b`, num_ctx 32768. Provider entry `ollama-local/qwen35-4b-32k`.
+Picked on the back of a Mar 2026 13-model tool-calling eval: 97.5% pass, 1st place
+above 18-25GB models. Question it answers: small model that actually calls tools
+(terminal commands) instead of talking about them.
+
+| Tier | Run 1 (1517) | Run 2 (1518) |
+|------|--------------|--------------|
+| L0a exact | PASS 4.0s | PASS 0.5s |
+| L0b story | PASS 18.1 tok/s | PASS 18.1 tok/s |
+| L1 edit | PASS 17.4 tok/s | PASS 18.9 tok/s |
+| L2 agent | PASS 70.2s | PASS 67.9s |
+
+3.9GB loaded, 100% GPU. L2 passed twice in a row -> **graduated**.
+Notably consistent (~68-70s both runs, no cold/warm split like the 7B coder's
+110s/3s) and ~2.5x faster chat decode than the bigger locals.
+Baselines: `results/qwen35-4b-32k-20260928-1517.md`, `...-1518.md`.
+
+## Updated recommendation (2026-09-28)
+
+- T3 Code terminal/agent (local): `ollama-local/qwen35-4b-32k` ✅ fastest + best tool-call reliability
+- T3 Code codegen quality: `ollama-local/qwen25-coder-32k` (7B coder, graduated earlier)
+- T3 Code chat/summarize: `ollama-local/qwen3.5-9b-32k` (smartest, ~10 tok/s)
+- Hard tasks: cloud.
+
 ## How to re-test any model
 
 Run `./scripts/bench-suite.sh <model>` (e.g. `./scripts/bench-suite.sh qwen3.5-9b-32k`).

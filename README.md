@@ -15,6 +15,7 @@ Reddit-verified daily driver: `qwen3.5:9b` GGUF Q4_K_M, thinking off, 32K contex
 - Env: `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_CONTEXT_LENGTH=32000`
 - Model: `qwen3.5:9b` (6.6GB) + wrapper `qwen3.5-9b-32k` (num_ctx 32768, think off)
 - Agent model: `qwen2.5-coder:7b` (4.7GB) + wrapper `qwen25-coder-32k` ✅ graduated (L2 2x PASS)
+- Tools model: `qwen3.5:4b` (3.4GB) + wrapper `qwen35-4b-32k` ✅ graduated (L2 2x PASS ~69s, ~18 tok/s)
 - Provider: `ollama-local` in `~/.config/opencode/opencode.json` -> `http://localhost:11434/v1`
 
 ## Quick start
@@ -30,7 +31,8 @@ ollama run qwen3.5-9b-32k "Reply with exactly: LOCAL OK"
 ## Real-world verdict in T3 Code
 
 See `docs/REALWORLD.md` + `results/` baselines.
-* Agent (local): `ollama-local/qwen25-coder-32k` ✅ L2 passed 2x (110s cold, 3s warm)
+* Agent (local): `ollama-local/qwen35-4b-32k` ✅ L2 passed 2x (~69s, ~18 tok/s, best tool-call reliability)
+* Codegen (local): `ollama-local/qwen25-coder-32k` ✅ L2 passed 2x (110s cold, 3s warm)
 * Chat (local): `ollama-local/qwen3.5-9b-32k` (~10 tok/s, smarter, no agent loop)
 * Hard tasks: cloud. A model graduates to "agent usable" only if L2 passes twice
   in a row via `bench-suite.sh`.
